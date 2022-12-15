@@ -478,41 +478,6 @@ class Graphic:
         ax.set_title(title, fontweight='normal', fontsize=20)
         ax.legend(loc="upper left", fontsize=14)
 
-    def __horizontal_graph(self, ax) -> None:
-        """
-        Создание горизонтального графика
-        @param ax: Местоположение графика
-        :type (matplotlib.axes._subplots.AxesSubplot)
-        @return: None
-        """
-        ax.grid(axis='x')
-        plt.rcdefaults()
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontsize(10)
-        city_salary = ["\n".join(city.split(" ")) for city in self.city_salary]
-        ax.barh([city for city in city_salary], [self.city_salary[key] for key in self.city_salary], align='center')
-        ax.invert_yaxis()
-        ax.set_title('Уровень зарплат по городам', fontweight='normal',  fontsize=20)
-
-    def __pie_graph(self, ax) -> None:
-        """
-        Создание круговой диаграммы
-        @param ax: Местоположение графика
-        :type (matplotlib.axes._subplots.AxesSubplot)
-        @return: None
-        """
-        plt.style.use('_mpl-gallery-nogrid')
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontsize(16)
-        vacancies = [self.city_vacancies[v] * 100 for v in self.city_vacancies]
-        cities = [city for city in self.city_vacancies]
-        sum_vacancies = sum(vacancies)
-        if sum_vacancies != 100:
-            vacancies.insert(0, 100 - sum_vacancies)
-            cities.insert(0, "Другие")
-        ax.set_title('Доля вакансий по городам', fontweight='normal',  fontsize=20)
-        ax.pie(vacancies, labels=cities)
-
 
 class PdfConverter:
     """
@@ -577,7 +542,9 @@ class Statistic:
         :type (str)
         @return: Статистика по заданному файлу
         :type (Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str])
-        >>> dataSet = DataSet("32.txt").process_vacancies(["name","salary_from",'salary_to','salary_currency','area_name',"published_at"],[["Системный аналитик","75000.0",'95000.0','RUR','Москва','2007-12-03T17:41:49+0300']])[0]
+        >>> headlines = ["name","salary_from",'salary_to','salary_currency','area_name',"published_at"]
+        >>> vacancies = [["Системный аналитик","75000.0",'95000.0','RUR','Москва','2007-12-03T17:41:49+0300']]
+        >>> dataSet = DataSet("32.txt").process_vacancies(headlines,vacancies)[0]
         >>> dataSet.name
         'Системный аналитик'
         >>> dataSet.year
@@ -615,7 +582,8 @@ class Statistic:
         @return: Возвращает 2 словаря 1 - выбранный параметр: средняя зарплата 2 - выбранный параметр: количество вакансий
         :type (Dict[int, int], Dict[int, int])
         """
-        return {x: y for x, y in zip([int(r.param) for r in param_salary], [0 if v.count_vacancies == 0 else int(v.salary / v.count_vacancies) for v in param_salary])},\
+        return {x: y for x, y in zip([int(r.param) for r in param_salary],
+                                     [0 if v.count_vacancies == 0 else int(v.salary / v.count_vacancies) for v in param_salary])},\
                {x: y for x, y in zip([int(r.param) for r in param_salary], [v.count_vacancies for v in param_salary])}
 
     def __add_missing_years(self, param_salary: List[YearSalary], year_salary : List[YearSalary]) -> List[YearSalary]:
@@ -737,4 +705,3 @@ if __name__ == "__main__":
                 value.update(el[i])
     CreateStatisticFiles(year_salary, year_vacancy, professions_year_salary, professions_year_vacancies, inp.profession).create_files()
     print(f"Concurrent futures {time.time() - start}")
-

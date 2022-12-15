@@ -225,12 +225,11 @@ class DataSet:
         for vacancy in vacancies:
             if (len(vacancy) == len(headlines)) and (all([v != "" for v in vacancy])):
                 vacancy = [" ".join(re.sub("<.*?>", "", value).replace('\n', '; ').split()) for value in vacancy]
-                vacancy = {x: y for x, y in zip([r for r in headlines], [v for v in vacancy])}
-                result.append(Vacancy(vacancy))
+                result.append(Vacancy({x: y for x, y in zip([r for r in headlines], [v for v in vacancy])}))
         return result
 
 
-class ParamSalary:
+class YearSalary:
     """
     Класс для представления параметра и связанной с ним зарплаты
     Attributes:
@@ -249,7 +248,7 @@ class ParamSalary:
         :type (str)
         @param salary: Зарплата для определенной вакансии
         :type (Salary)
-        >>> ParamSalary("year", Salary(1000, 2000, "USD")).salary
+        >>> YearSalary("year", Salary(1000, 2000, "USD")).salary
         90990.0
         """
         self.param = param
@@ -262,9 +261,9 @@ class ParamSalary:
         @param new_salary: Зарплата для добавления
         :type (Salary)
         @return: None
-        >>> ParamSalary("city", Salary(100, 200, "RUR")).add_salary(Salary(200, 300, "RUR")).salary
+        >>> YearSalary("city", Salary(100, 200, "RUR")).add_salary(Salary(200, 300, "RUR")).salary
         400.0
-        >>> ParamSalary("city", Salary(100, 200, "RUR")).add_salary(Salary(200, 300, "RUR")).count_vacancies
+        >>> YearSalary("city", Salary(100, 200, "RUR")).add_salary(Salary(200, 300, "RUR")).count_vacancies
         2
         """
         self.count_vacancies += 1
@@ -442,8 +441,6 @@ class Graphic:
         self.__grouped_bar_graph(ax2, 'Количество вакансий по годам', self.count_vacancies_by_year, self.years,
                                  self.count_vacancies_by_year_prof, 'Количество вакансий',
                                  f'Количество вакансий {self.profession}')
-        #self.__horizontal_graph(ax3)
-        #self.__pie_graph(ax4)
         plt.tight_layout()
         #plt.show()
         fig.savefig(file_name)
@@ -477,41 +474,6 @@ class Graphic:
         ax.tick_params(axis="both", labelsize=16)
         ax.set_title(title, fontweight='normal', fontsize=20)
         ax.legend(loc="upper left", fontsize=14)
-
-    def __horizontal_graph(self, ax) -> None:
-        """
-        Создание горизонтального графика
-        @param ax: Местоположение графика
-        :type (matplotlib.axes._subplots.AxesSubplot)
-        @return: None
-        """
-        ax.grid(axis='x')
-        plt.rcdefaults()
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontsize(10)
-        city_salary = ["\n".join(city.split(" ")) for city in self.city_salary]
-        ax.barh([city for city in city_salary], [self.city_salary[key] for key in self.city_salary], align='center')
-        ax.invert_yaxis()
-        ax.set_title('Уровень зарплат по городам', fontweight='normal',  fontsize=20)
-
-    def __pie_graph(self, ax) -> None:
-        """
-        Создание круговой диаграммы
-        @param ax: Местоположение графика
-        :type (matplotlib.axes._subplots.AxesSubplot)
-        @return: None
-        """
-        plt.style.use('_mpl-gallery-nogrid')
-        for label in (ax.get_xticklabels() + ax.get_yticklabels()):
-            label.set_fontsize(16)
-        vacancies = [self.city_vacancies[v] * 100 for v in self.city_vacancies]
-        cities = [city for city in self.city_vacancies]
-        sum_vacancies = sum(vacancies)
-        if sum_vacancies != 100:
-            vacancies.insert(0, 100 - sum_vacancies)
-            cities.insert(0, "Другие")
-        ax.set_title('Доля вакансий по городам', fontweight='normal',  fontsize=20)
-        ax.pie(vacancies, labels=cities)
 
 
 class PdfConverter:
@@ -577,42 +539,39 @@ class Statistic:
         :type (str)
         @return: Статистика по заданному файлу
         :type (Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str])
-        >>> dataSet = DataSet("32.txt").process_vacancies(["name","salary_from",'salary_to','salary_currency','area_name',"published_at"],[["Системный аналитик","75000.0",'95000.0','RUR','Москва','2007-12-03T17:41:49+0300']])[0]
+        >>> headlines = ["name","salary_from",'salary_to','salary_currency','area_name',"published_at"]
+        >>> vacancies = [["Системный аналитик","75000.0",'95000.0','RUR','Москва','2007-12-03T17:41:49+0300']]
+        >>> dataSet = DataSet("32.txt").process_vacancies(headlines,vacancies)[0]
         >>> dataSet.name
         'Системный аналитик'
         >>> dataSet.year
         '2007'
         """
         data = DataSet(file_name).vacancies_objects
-        profession = self.profession
-        data_profession = [d for d in data if profession in d.name]
-        year_salary = self.convert_to_param_salary(data, "year")
-        professions_year_salary = self.__add_missing_years(self.convert_to_param_salary(data_profession, "year"), year_salary)
+        data_profession = [d for d in data if self.profession in d.name]
+        year_salary = self.convert_to_param_salary(data)
+        professions_year_salary = self.__add_missing_years(self.convert_to_param_salary(data_profession), year_salary)
         year_salary, year_vacancy = self.__convert_from_param_salary_to_dict(year_salary)
         professions_year_salary, professions_year_vacancies = self.__convert_from_param_salary_to_dict(professions_year_salary)
         return year_salary, year_vacancy, professions_year_salary, professions_year_vacancies
 
-    def convert_to_param_salary(self, vacancies: List[Vacancy], comparison_param: str) -> (List[ParamSalary]):
+    def convert_to_param_salary(self, vacancies: List[Vacancy]) -> (List[YearSalary]):
         """
         Конвертирует список вакансий по параметру сравнения в список класса ParamSalary
         @param vacancies: Набор вакансий
-        :type (str)
-        @param comparison_param: Параметр сравнения
         :type (str)
         @return: Список данных класса ParamSalary
         :type (List[ParamSalary])
         """
         param_salary = {}
         for vacancy in vacancies:
-            dict_comparison_params = {"year": vacancy.year, "city": vacancy.area_name}
-            param = dict_comparison_params[comparison_param]
-            if not param_salary.__contains__(param):
-                param_salary[param] = ParamSalary(param, vacancy.salary)
+            if not param_salary.__contains__(vacancy.year):
+                param_salary[vacancy.year] = YearSalary(vacancy.year, vacancy.salary)
             else:
-                param_salary[param] = param_salary[param].add_salary(vacancy.salary)
+                param_salary[vacancy.year] = param_salary[vacancy.year].add_salary(vacancy.salary)
         return [param_salary[d] for d in param_salary]
 
-    def __convert_from_param_salary_to_dict(self, param_salary: List[ParamSalary]) -> (Dict[int, int], Dict[int, int]):
+    def __convert_from_param_salary_to_dict(self, param_salary: List[YearSalary]) -> (Dict[int, int], Dict[int, int]):
         """
         Нужен для обработки списка данных класса ParamSalary и возвращения 2 словарей 1 - выбранный параметр: средняя зарплата 2 - выбранный параметр: количество вакансий
         @param param_salary: Список данных класса ParamSalary
@@ -623,7 +582,7 @@ class Statistic:
         return {x: y for x, y in zip([int(r.param) for r in param_salary], [0 if v.count_vacancies == 0 else int(v.salary / v.count_vacancies) for v in param_salary])},\
                {x: y for x, y in zip([int(r.param) for r in param_salary], [v.count_vacancies for v in param_salary])}
 
-    def __add_missing_years(self, param_salary: List[ParamSalary], year_salary : List[ParamSalary]) -> List[ParamSalary]:
+    def __add_missing_years(self, param_salary: List[YearSalary], year_salary : List[YearSalary]) -> List[YearSalary]:
         """
         Добавляет года, пропущенные при выборке данных
         @param param_salary:  Список данных класса ParamSalary
@@ -637,7 +596,7 @@ class Statistic:
         s_years = [el.param for el in param_salary]
         for y in years:
             if y not in s_years:
-                param_salary.insert(int(y) - int(years[0]), ParamSalary(y, Salary("0", "0", "RUR")))
+                param_salary.insert(int(y) - int(years[0]), YearSalary(y, Salary("0", "0", "RUR")))
                 param_salary[int(y) - int(years[0])].count_vacancies = 0
         return param_salary
 
@@ -732,6 +691,7 @@ class InputConnect:
 if __name__ == "__main__":
     year_salary, year_vacancy, professions_year_salary, professions_year_vacancies = {}, {}, {}, {}
     inp = InputConnect()
+    start = time.time()
     files = [str(file) for file in pathlib.Path(f"./{inp.directory}").iterdir()]
     stats = Statistic(inp.profession)
     with Pool() as p:
@@ -740,3 +700,5 @@ if __name__ == "__main__":
             for i, value in zip(range(4), [year_salary, year_vacancy, professions_year_salary, professions_year_vacancies]):
                 value.update(el[i])
     CreateStatisticFiles(year_salary, year_vacancy, professions_year_salary, professions_year_vacancies, inp.profession).create_files()
+    print(f"Multiprocessing - {time.time() - start}")
+
